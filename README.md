@@ -8,6 +8,7 @@
 
 It is built as a **Single-File Application**, meaning the entire logic resides in one lightweight HTML file.
 
+<img src="Screenshots/Screenshot 2025-12-05 233727.png" alt="App Preview" width="800">
 ---
 
 ## ✨ Key Features
