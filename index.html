@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ghost P2P - Ultimate Secure Transfer</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(17, 24, 39, 0.75);
+        }
+
+        body {
+            background-color: #030712;
+            color: #f3f4f6;
+            font-family: 'Inter', system-ui, sans-serif;
+            height: 100dvh; /* Dynamic Viewport Height for Mobile */
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* Ambient Background */
+        .ambient-light { position: absolute; width: 100%; height: 100%; overflow: hidden; z-index: 0; pointer-events: none; }
+        .blob { position: absolute; filter: blur(90px); opacity: 0.3; animation: float 25s infinite ease-in-out; }
+        .blob-1 { top: -20%; left: -20%; width: 60vw; height: 60vw; background: radial-gradient(circle, #3b82f6 0%, transparent 70%); }
+        .blob-2 { bottom: -20%; right: -20%; width: 70vw; height: 70vw; background: radial-gradient(circle, #8b5cf6 0%, transparent 70%); animation-delay: -5s; }
+
+        @keyframes float { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(30px, -30px) scale(1.05); } }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .typing-dot { animation: typing 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing { 0%, 80%, 100% { transform: scale(0); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        .input-modern {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+        .input-modern:focus {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .markdown-body p { margin-bottom: 0.5rem; }
+        
+        /* Smooth Color Transition for Copy Feedback */
+        .copy-feedback { transition: color 0.3s ease, transform 0.2s ease; }
+    </style>
+</head>
+<body class="selection:bg-blue-500/30 relative flex flex-col">
+
+    <div class="ambient-light">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div id="drag-overlay" class="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="p-8 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6 animate-bounce">
+            <i class="fas fa-paste text-6xl text-blue-400"></i>
+        </div>
+        <h2 class="text-3xl font-bold text-white">Drop or Paste (Ctrl+V)</h2>
+    </div>
+
+    <div id="transfer-container" class="fixed top-24 right-4 md:right-8 z-[90] flex flex-col items-end gap-3 pointer-events-none"></div>
+
+    <div id="view-help" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4 fade-in">
+        <div class="glass-panel w-full max-w-3xl rounded-3xl overflow-hidden flex flex-col shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50 sticky top-0 backdrop-blur-md z-10">
+                <div class="flex items-center gap-3">
+                     <div class="w-8 h-8 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                        <i class="fas fa-book text-blue-400 text-sm"></i>
+                     </div>
+                     <h2 class="text-xl font-bold text-white">Documentation</h2>
+                </div>
+                <button onclick="uiManager.toggleHelp()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-8 space-y-10">
+                
+                <section>
+                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Core Capabilities</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div class="p-4 bg-slate-800/40 rounded-xl border border-white/5 hover:border-blue-500/30 transition-colors">
+                            <i class="fas fa-shield-alt text-xl text-blue-400 mb-2"></i>
+                            <h4 class="text-sm font-bold text-white">End-to-End Encrypted</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">WebRTC DTLS/SRTP security.</p>
+                        </div>
+                        <div class="p-4 bg-slate-800/40 rounded-xl border border-white/5 hover:border-violet-500/30 transition-colors">
+                            <i class="fas fa-server text-xl text-violet-400 mb-2"></i>
+                            <h4 class="text-sm font-bold text-white">Serverless</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Direct P2P. No logs stored.</p>
+                        </div>
+                        <div class="p-4 bg-slate-800/40 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-colors">
+                            <i class="fas fa-hdd text-xl text-emerald-400 mb-2"></i>
+                            <h4 class="text-sm font-bold text-white">10 GB Files</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">High-performance chunking.</p>
+                        </div>
+                        <div class="p-4 bg-slate-800/40 rounded-xl border border-white/5 hover:border-pink-500/30 transition-colors">
+                            <i class="fas fa-paste text-xl text-pink-400 mb-2"></i>
+                            <h4 class="text-sm font-bold text-white">Smart Clipboard</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Paste images (Ctrl+V) directly.</p>
+                        </div>
+                        <div class="p-4 bg-slate-800/40 rounded-xl border border-white/5 hover:border-amber-500/30 transition-colors">
+                            <i class="fas fa-bell text-xl text-amber-400 mb-2"></i>
+                            <h4 class="text-sm font-bold text-white">Notifications</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Background alerts for transfers.</p>
+                        </div>
+                        <div class="p-4 bg-slate-800/40 rounded-xl border border-white/5 hover:border-cyan-500/30 transition-colors">
+                            <i class="fas fa-stopwatch text-xl text-cyan-400 mb-2"></i>
+                            <h4 class="text-sm font-bold text-white">Ephemeral Rooms</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Auto-destruct timers available.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Quick Start Guide</h3>
+                    <div class="space-y-4">
+                        <div class="flex gap-4 items-start">
+                            <div class="w-8 h-8 rounded-full bg-slate-700 text-white font-bold flex items-center justify-center flex-shrink-0 text-sm">1</div>
+                            <div>
+                                <h4 class="text-white font-bold text-sm">Initialize Session</h4>
+                                <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                                    Click <strong>Host Room</strong>. You can set an optional password or a self-destruct timer for increased security.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 items-start">
+                            <div class="w-8 h-8 rounded-full bg-slate-700 text-white font-bold flex items-center justify-center flex-shrink-0 text-sm">2</div>
+                            <div>
+                                <h4 class="text-white font-bold text-sm">Establish Connection</h4>
+                                <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                                    Click the ID in the header to copy it, or use the <i class="fas fa-link mx-1 text-blue-400"></i> icon for the full link. Send this to your peer.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 items-start">
+                            <div class="w-8 h-8 rounded-full bg-slate-700 text-white font-bold flex items-center justify-center flex-shrink-0 text-sm">3</div>
+                            <div>
+                                <h4 class="text-white font-bold text-sm">Transfer & Communicate</h4>
+                                <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                                    Drag & drop files onto the window, use the <i class="fas fa-paperclip mx-1"></i> button, or paste screenshots with <strong>Ctrl+V</strong>.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-white/5">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Keyboard Shortcuts</h3>
+                        <ul class="space-y-2 text-xs text-slate-300">
+                            <li class="flex justify-between border-b border-white/5 pb-1">
+                                <span>Send Message</span> <span class="font-mono text-slate-500 bg-slate-800 px-1 rounded">Enter</span>
+                            </li>
+                            <li class="flex justify-between border-b border-white/5 pb-1">
+                                <span>New Line</span> <span class="font-mono text-slate-500 bg-slate-800 px-1 rounded">Shift + Enter</span>
+                            </li>
+                            <li class="flex justify-between border-b border-white/5 pb-1">
+                                <span>Paste Image</span> <span class="font-mono text-slate-500 bg-slate-800 px-1 rounded">Ctrl + V</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                         <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Technical Specs</h3>
+                         <ul class="space-y-2 text-xs text-slate-400 font-mono">
+                            <li><span class="text-blue-500">Protocol:</span> WebRTC (ICE/STUN)</li>
+                            <li><span class="text-blue-500">Encryption:</span> AES-128/256 GCM</li>
+                            <li><span class="text-blue-500">Max File Size:</span> 10 GB (soft limit)</li>
+                            <li><span class="text-blue-500">Chunk Size:</span> 64 KB (Binary)</li>
+                        </ul>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="relative z-10 w-full h-full flex flex-col">
+
+        <header id="main-header" class="flex justify-between items-center p-6 md:px-8 flex-shrink-0 z-50">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg border border-blue-500/30 bg-blue-500/5 flex items-center justify-center relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <i class="fas fa-ghost text-lg text-blue-400 group-hover:text-blue-300 transition-colors"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-slate-300 leading-none uppercase font-mono">
+                        GHOST<span class="text-blue-400">P2P</span>
+                    </h1>
+                    <div class="flex items-center gap-2 mt-1.5">
+                        <div id="status-indicator" class="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-500 bg-slate-800/80 px-2 py-0.5 rounded-sm border border-slate-700/50 font-mono">
+                            <span class="w-1 h-1 rounded-full bg-slate-500"></span> Offline
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button onclick="soundManager.toggle()" id="btn-sound" class="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 hover:text-white flex items-center justify-center transition-colors" title="Toggle Sound">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+                
+                <button onclick="uiManager.toggleHelp()" class="bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg text-slate-300 hover:text-white transition-colors px-3 py-2 text-sm font-medium flex items-center gap-2" style="height: 40px;">
+                    <i class="fas fa-question-circle"></i> <span class="hidden sm:inline">Guide</span>
+                </button>
+            </div>
+        </header>
+
+        <div id="view-lobby" class="flex-1 min-h-0 flex flex-col items-center justify-center fade-in pb-20 px-4">
+            <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10">
+                <div class="glass-panel p-8 rounded-3xl relative group overflow-hidden transform hover:scale-[1.01] transition-all duration-300">
+                    <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <i class="fas fa-satellite-dish text-9xl text-blue-500 transform rotate-12"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 text-xl mb-5"><i class="fas fa-plus"></i></div>
+                        <h2 class="text-2xl font-bold text-white mb-2">Host Room</h2>
+                        <p class="text-slate-400 text-sm mb-6">Create a secure space.</p>
+                        <form onsubmit="startHosting(event)" class="space-y-4">
+                            <input id="host-name" type="text" placeholder="Your Name" required maxlength="15" class="w-full px-4 py-3 rounded-xl text-white input-modern focus:outline-none placeholder-slate-600">
+                            <div class="grid grid-cols-2 gap-3">
+                                <input id="host-password" type="text" placeholder="Password (Opt)" class="w-full px-4 py-3 rounded-xl text-white input-modern focus:outline-none placeholder-slate-600">
+                                <select id="host-duration" class="w-full px-4 py-3 rounded-xl text-white bg-slate-900/50 border border-slate-700 focus:border-blue-500 outline-none cursor-pointer">
+                                    <option value="0">Never</option>
+                                    <option value="10">10 Mins</option>
+                                    <option value="30">30 Mins</option>
+                                    <option value="60">1 Hour</option>
+                                    <option value="720">12 Hours</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full mt-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98]">
+                                Create Room <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-8 rounded-3xl relative group overflow-hidden border-white/5 hover:border-violet-500/20 transition-colors transform hover:scale-[1.01] duration-300">
+                     <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <i class="fas fa-plug text-9xl text-violet-500 transform -rotate-12"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <div class="w-12 h-12 rounded-2xl bg-violet-500/20 flex items-center justify-center text-violet-400 text-xl mb-5"><i class="fas fa-link"></i></div>
+                        <h2 class="text-2xl font-bold text-white mb-2">Join Room</h2>
+                        <p class="text-slate-400 text-sm mb-6">Enter ID or use invite link.</p>
+                        <form onsubmit="joinRoom(event)" class="space-y-4">
+                            <input id="join-name" type="text" placeholder="Your Name" required maxlength="15" class="w-full px-4 py-3 rounded-xl text-white input-modern focus:outline-none placeholder-slate-600">
+                            <input id="join-id" type="text" placeholder="Room ID" required class="w-full px-4 py-3 rounded-xl text-white font-mono input-modern focus:outline-none placeholder-slate-600 uppercase border-violet-500/30 focus:border-violet-500">
+                            <input id="join-password" type="password" placeholder="Password (If set)" class="w-full px-4 py-3 rounded-xl text-white input-modern focus:outline-none placeholder-slate-600">
+                            <button type="submit" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3.5 rounded-xl border border-slate-600 hover:border-violet-500 transition-all flex items-center justify-center gap-2 active:scale-[0.98]">
+                                Connect Now
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-chat" class="hidden flex-1 min-h-0 w-full p-2 md:p-6 pt-0 fade-in items-center justify-center">
+            <div class="glass-panel w-full h-full max-w-[1600px] rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl border border-white/10 relative">
+                
+                <div id="users-sidebar" class="w-64 bg-slate-900/50 backdrop-blur-xl border-r border-white/5 flex-col absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform z-30 flex">
+                    <div class="p-5 border-b border-white/5 bg-slate-900/30 flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Members</span>
+                        <button class="md:hidden text-slate-400" onclick="uiManager.toggleUserList()"><i class="fas fa-times"></i></button>
+                    </div>
+                    <ul id="user-list-container" class="flex-1 overflow-y-auto p-3 space-y-1"></ul>
+                    <div class="p-4 border-t border-white/5 bg-slate-900/30">
+                         <button onclick="disconnect()" class="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                            <i class="fas fa-power-off"></i> Disconnect
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col min-w-0 bg-black/20 relative">
+                    <div class="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-slate-900/40 backdrop-blur-md z-20">
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                             <button class="md:hidden text-slate-400 hover:text-white" onclick="uiManager.toggleUserList()"><i class="fas fa-bars"></i></button>
+                            <div class="min-w-0 flex-1 flex items-center gap-4">
+                                <div class="flex flex-col">
+                                    <div class="flex items-center gap-2">
+                                        <h2 id="display-room-id" class="font-mono text-sm font-bold text-white cursor-pointer hover:text-blue-400 copy-feedback" onclick="copyRoomId()" title="Click to Copy ID">Loading...</h2>
+                                        
+                                        <button onclick="copyInviteLink()" class="w-6 h-6 rounded bg-slate-700 hover:bg-blue-600 text-slate-300 hover:text-white flex items-center justify-center transition-colors shadow-lg" title="Copy Invite Link">
+                                            <i class="fas fa-link text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                                        <span id="user-count"><i class="fas fa-users mr-1"></i> 1</span>
+                                    </div>
+                                </div>
+                                <div id="timer-container" class="hidden px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full flex items-center gap-2">
+                                    <i class="fas fa-clock text-orange-400 text-xs"></i>
+                                    <span id="time-left" class="text-orange-300 text-xs font-mono font-bold">--:--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth">
+                        <div class="flex justify-center mb-6">
+                            <span class="text-[10px] text-slate-500 bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
+                                <i class="fas fa-shield-alt mr-1"></i> End-to-End Encrypted Session
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-6 bg-slate-900/60 backdrop-blur-lg border-t border-white/5 relative z-20">
+                        <div id="typing-indicator" class="absolute top-[-2rem] left-8 text-xs text-slate-400 hidden items-center gap-2">
+                            <span class="w-1.5 h-1.5 bg-blue-400 rounded-full typing-dot"></span>
+                            <span class="w-1.5 h-1.5 bg-blue-400 rounded-full typing-dot"></span>
+                            <span class="w-1.5 h-1.5 bg-blue-400 rounded-full typing-dot"></span>
+                            <span id="typing-names" class="font-medium text-blue-400 ml-1">Someone</span> is typing
+                        </div>
+
+                        <div id="file-preview-container" class="hidden mb-3 p-3 bg-slate-800/90 rounded-xl border border-white/10 flex items-center gap-4 relative animate-in slide-in-from-bottom-2">
+                             <div class="w-12 h-12 rounded-lg bg-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                <i id="preview-icon" class="fas fa-file text-slate-400 text-xl"></i>
+                                <img id="preview-image" class="w-full h-full object-cover hidden">
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                 <p class="text-sm font-bold text-white truncate" id="preview-filename">File.txt</p>
+                                 <p class="text-xs text-slate-400" id="preview-filesize">0 MB</p>
+                            </div>
+                            <button onclick="clearFileSelection()" class="w-8 h-8 rounded-full bg-slate-700 hover:bg-red-500 hover:text-white text-slate-400 flex items-center justify-center transition-colors absolute -top-3 -right-3 shadow-lg">
+                                <i class="fas fa-times text-sm"></i>
+                            </button>
+                        </div>
+
+                        <form onsubmit="sendMessage(event)" class="flex gap-4 items-end">
+                             <input type="file" id="file-input" class="hidden" onchange="handleFileSelect(this)">
+                             <button type="button" onclick="document.getElementById('file-input').click()" class="w-12 h-12 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-blue-400 border border-slate-700 transition-all flex items-center justify-center flex-shrink-0" title="Send File"><i class="fas fa-paperclip text-lg"></i></button>
+                            <textarea id="msg-input" rows="1" placeholder="Type message or Paste (Ctrl+V)..." oninput="handleTyping(this)" onkeydown="handleChatKey(event)" class="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-5 py-3.5 text-white focus:border-blue-500 focus:bg-slate-800 outline-none transition-all resize-none custom-scrollbar leading-relaxed text-base" style="min-height: 50px; max-height: 140px;"></textarea>
+                            <button id="btn-send" type="submit" class="w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center flex-shrink-0"><i class="fas fa-paper-plane text-lg"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PEER_CONFIG = { config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } };
+        const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
+        const CHUNK_SIZE = 64 * 1024;
+        
+        let peer, myConn, connections = [], isHost = false, myName = "Anon", roomId = "", roomPassword = "", expireTimestamp = 0;
+        let pendingFile = null, heartbeatInterval = null, roomTimer = null;
+        
+        // --- TYPING VARS ---
+        let typingSendTimeout = null; 
+        let typingHideTimeout = null;
+        let isTypingSent = false;
+        
+        let incomingFiles = {}, activeTransfers = {};
+        const safe = (str) => DOMPurify.sanitize(str); 
+
+        // SOUND MANAGER
+        const soundManager = {
+            ctx: null,
+            muted: false,
+            init() { if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) this.ctx = new AC(); } if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+            toggle() { 
+                this.muted = !this.muted; 
+                const btn = document.getElementById('btn-sound');
+                btn.innerHTML = this.muted ? '<i class="fas fa-volume-mute text-slate-500"></i>' : '<i class="fas fa-volume-up"></i>';
+            },
+            play(type) {
+                if (!this.ctx || this.muted) return; 
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.connect(gain); gain.connect(this.ctx.destination);
+                const now = this.ctx.currentTime;
+                if (type === 'sent') { osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.15); gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15); osc.start(now); osc.stop(now + 0.2); }
+                else if (type === 'received') { osc.frequency.setValueAtTime(300, now); osc.frequency.linearRampToValueAtTime(400, now + 0.1); gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.08, now + 0.05); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3); osc.start(now); osc.stop(now + 0.35); }
+                else if (type === 'notification') { osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(400, now + 0.2); gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.2); osc.start(now); osc.stop(now + 0.2); }
+            }
+        };
+        document.body.addEventListener('click', () => soundManager.init(), { once: true });
+        document.body.addEventListener('keydown', () => soundManager.init(), { once: true });
+
+        // NOTIFICATION MANAGER
+        const notify = (title, body) => {
+            if (document.hidden && Notification.permission === "granted") {
+                new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/3588/3588107.png' });
+                soundManager.play('notification');
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+        };
+
+        const uiManager = {
+            toggleHelp() { const el = document.getElementById('view-help'); el.classList.contains('hidden') ? (el.classList.remove('hidden'), el.classList.add('flex')) : (el.classList.add('hidden'), el.classList.remove('flex')); },
+            toggleUserList() { document.getElementById('users-sidebar').classList.toggle('-translate-x-full'); },
+            showChat() {
+                document.getElementById('view-lobby').classList.add('hidden'); document.getElementById('view-lobby').classList.remove('flex');
+                document.getElementById('view-chat').classList.remove('hidden'); document.getElementById('view-chat').classList.add('flex');
+                document.getElementById('display-room-id').innerText = roomId; setTimeout(() => document.getElementById('msg-input').focus(), 100);
+                if (Notification.permission === "default") Notification.requestPermission();
+            }
+        };
+
+        const els = {
+            msgs: document.getElementById('chat-messages'), users: document.getElementById('user-list-container'),
+            preview: document.getElementById('file-preview-container'), typing: document.getElementById('typing-indicator'),
+            txtInput: document.getElementById('msg-input'), timerContainer: document.getElementById('timer-container'), timeLeft: document.getElementById('time-left'),
+            transferContainer: document.getElementById('transfer-container')
+        };
+
+        window.addEventListener('load', () => {
+             if(window.location.hash.startsWith('#ghost-')) {
+                 document.getElementById('join-id').value = window.location.hash.substring(1);
+                 document.getElementById('join-id').classList.add('border-blue-500'); setTimeout(() => document.getElementById('join-name').focus(), 100);
+             }
+        });
+
+        function handleFileSelect(el) { if (el.files && el.files[0]) processFile(el.files[0]); }
+        
+        // --- CLIPBOARD PASTE SUPPORT ---
+        window.addEventListener('paste', e => {
+            if (document.getElementById('view-chat').classList.contains('hidden')) return;
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file') {
+                    const blob = item.getAsFile();
+                    const file = new File([blob], `Screenshot_${new Date().toISOString().slice(11,19).replace(/:/g,'-')}.png`, { type: blob.type });
+                    processFile(file);
+                }
+            }
+        });
+
+        // --- TYPING LOGIC ---
+        function handleTyping(el) {
+            el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+            if (!isTypingSent) {
+                isTypingSent = true;
+                const pkg = {type: 'TYPING', payload: {user: myName, isTyping: true}};
+                if(isHost) broadcast(pkg); else if(myConn) myConn.send(pkg);
+            }
+            if (typingSendTimeout) clearTimeout(typingSendTimeout);
+            typingSendTimeout = setTimeout(() => {
+                isTypingSent = false;
+                const pkg = {type: 'TYPING', payload: {user: myName, isTyping: false}};
+                if(isHost) broadcast(pkg); else if(myConn) myConn.send(pkg);
+            }, 1000);
+        }
+
+        function showTyping(u, isTyping) {
+            const el = els.typing;
+            const nameEl = document.getElementById('typing-names');
+            if (isTyping) {
+                nameEl.innerText = safe(u); el.classList.remove('hidden'); el.classList.add('flex');
+                if (typingHideTimeout) clearTimeout(typingHideTimeout);
+                typingHideTimeout = setTimeout(() => { el.classList.add('hidden'); el.classList.remove('flex'); }, 3000);
+            } else {
+                if (typingHideTimeout) clearTimeout(typingHideTimeout);
+                el.classList.add('hidden'); el.classList.remove('flex');
+            }
+        }
+
+        // --- TRANSFER UI ---
+        function createTransferCard(id, name, size, type) {
+            const div = document.createElement('div');
+            div.id = `trans-card-${id}`;
+            div.className = "w-72 glass-panel p-3 rounded-xl border border-white/10 shadow-xl pointer-events-auto fade-in";
+            div.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <i class="fas fa-${type === 'upload' ? 'arrow-up text-blue-400' : 'arrow-down text-emerald-400'} text-xs"></i>
+                        <span class="text-xs font-bold text-white truncate max-w-[150px]">${safe(name)}</span>
+                    </div>
+                    <button onclick="cancelTransfer('${id}')" class="text-slate-400 hover:text-red-400 transition-colors"><i class="fas fa-times text-xs"></i></button>
+                </div>
+                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                    <div id="trans-bar-${id}" class="bg-${type === 'upload' ? 'blue' : 'emerald'}-500 h-full w-0 transition-all duration-200"></div>
+                </div>
+                <div class="flex justify-between mt-1">
+                    <span class="text-[9px] text-slate-400 uppercase tracking-wide">${(size/1024/1024).toFixed(1)} MB</span>
+                    <span id="trans-pct-${id}" class="text-[9px] font-mono text-white">0%</span>
+                </div>`;
+            els.transferContainer.appendChild(div);
+        }
+
+        function updateTransferProgress(id, pct) {
+            const bar = document.getElementById(`trans-bar-${id}`);
+            const text = document.getElementById(`trans-pct-${id}`);
+            if(bar) bar.style.width = pct + "%";
+            if(text) text.innerText = pct + "%";
+        }
+
+        function removeTransferCard(id) {
+            const el = document.getElementById(`trans-card-${id}`);
+            if(el) { el.classList.add('opacity-0', 'translate-x-full', 'transition-all'); setTimeout(() => el.remove(), 500); }
+        }
+
+        function completeTransferUI(id, isSender) {
+            const el = document.getElementById(`file-status-${id}`);
+            const icon = document.getElementById(`file-icon-${id}`);
+            if(el) { el.innerText = isSender ? "Sent" : "Received"; el.classList.add('text-emerald-400'); }
+            if(icon) { icon.innerHTML = '<i class="fas fa-check text-emerald-400"></i>'; icon.classList.remove('bg-slate-700'); icon.classList.add('bg-emerald-500/20'); }
+            if (!isSender) notify("File Received", "A file transfer has finished.");
+        }
+
+        function updateCancelUI(id) {
+            const statusEl = document.getElementById(`file-status-${id}`);
+            const iconEl = document.getElementById(`file-icon-${id}`);
+            if(statusEl) { statusEl.innerText = "Cancelled"; statusEl.classList.add('text-red-400'); }
+            if(iconEl) { iconEl.innerHTML = '<i class="fas fa-times text-red-400"></i>'; iconEl.classList.remove('bg-slate-700'); iconEl.classList.add('bg-red-500/10'); }
+        }
+
+        function cancelTransfer(id) {
+            if(activeTransfers[id]) {
+                activeTransfers[id].cancelled = true;
+                removeTransferCard(id);
+                const pkg = {type: 'FILE_CANCEL', payload: {fileId: id}};
+                if(isHost) broadcast(pkg); else if(myConn) myConn.send(pkg);
+                updateCancelUI(id);
+            }
+        }
+
+        // --- PEER & COMMS ---
+        function startHosting(e) {
+            e.preventDefault(); myName = document.getElementById('host-name').value.trim() || "Anon";
+            roomPassword = document.getElementById('host-password').value;
+            const dur = parseInt(document.getElementById('host-duration').value);
+            if(dur > 0) expireTimestamp = Date.now() + (dur * 60 * 1000);
+            isHost = true; roomId = "ghost-" + Math.random().toString(36).substr(2, 6); initPeer(roomId);
+        }
+        function joinRoom(e) {
+            e.preventDefault(); myName = document.getElementById('join-name').value.trim() || "Anon";
+            let id = document.getElementById('join-id').value.trim(); if(id.includes('#')) id = id.split('#').pop();
+            isHost = false; roomId = id; initPeer(null); 
+        }
+        function initPeer(id) {
+            try { peer = new Peer(id, PEER_CONFIG); } catch(e) { return alert(e); }
+            peer.on('open', (pid) => {
+                if(isHost) { roomId = pid; setStatus(true); uiManager.showChat(); syncUserList(); if(expireTimestamp > 0) startTimer(); startHeartbeat(); history.pushState(null, null, `#${pid}`); } 
+                else { connectToHost(roomId); }
+            });
+            peer.on('connection', (conn) => { if(isHost) handleIncoming(conn); });
+            peer.on('error', (err) => { console.error(err); if(err.type === 'peer-unavailable') alert("Room not found or host offline."); });
+            peer.on('disconnected', () => { setStatus(false); peer.reconnect(); });
+        }
+        function connectToHost(hostId) {
+            const conn = peer.connect(hostId); setupConnEvents(conn);
+            conn.on('open', () => conn.send({type: 'AUTH', payload: {name: myName, password: document.getElementById('join-password').value}}));
+            myConn = conn;
+        }
+        function handleIncoming(conn) { setupConnEvents(conn); }
+        function setupConnEvents(conn) {
+            conn.on('data', (data) => handlePacket(data, conn));
+            conn.on('close', () => { connections = connections.filter(c => c !== conn); if(isHost) { broadcast({type: 'SYSTEM', payload: `${conn.user||'Peer'} left`}); syncUserList(); } });
+        }
+        function handlePacket(data, conn) {
+            if(data.type === 'PING') return;
+            if(isHost && !conn.authenticated) {
+                if(data.type === 'AUTH') {
+                    if(roomPassword && data.payload.password !== roomPassword) { conn.send({type: 'ERROR', payload: 'Wrong Password'}); setTimeout(()=>conn.close(), 500); } 
+                    else { conn.user = safe(data.payload.name).substring(0,20); conn.authenticated = true; connections.push(conn); conn.send({type: 'WELCOME', payload: {roomName: roomId, expireAt: expireTimestamp}}); broadcast({type: 'SYSTEM', payload: `${conn.user} joined`}); syncUserList(); soundManager.play('received'); }
+                } return;
+            }
+            switch(data.type) {
+                case 'WELCOME': setStatus(true); expireTimestamp = data.payload.expireAt; uiManager.showChat(); if(expireTimestamp > 0) startTimer(); startHeartbeat(); addSystemMessage(`Connected to ${roomId}`); soundManager.play('received'); break;
+                case 'ERROR': alert(data.payload); location.reload(); break;
+                case 'CHAT': 
+                    addMessageToUI(data.payload, false); 
+                    if(isHost) broadcast(data, conn); 
+                    soundManager.play('received'); 
+                    notify(`Message from ${data.payload.sender}`, data.payload.text.substring(0,50));
+                    break;
+                case 'SYSTEM': addSystemMessage(data.payload); if(isHost) broadcast(data, conn); break;
+                case 'USER_LIST': updateUserListUI(data.payload); break;
+                case 'TYPING': showTyping(data.payload.user, data.payload.isTyping); if(isHost) broadcast(data, conn); break;
+                case 'FILE_START': initIncomingFile(data.payload); if(isHost) broadcast(data, conn); soundManager.play('received'); break;
+                case 'FILE_CHUNK': processFileChunk(data.payload); if(isHost) broadcast(data, conn); break;
+                case 'FILE_CANCEL': 
+                    const cid = data.payload.fileId; if(activeTransfers[cid]) activeTransfers[cid].cancelled = true; if(incomingFiles[cid]) delete incomingFiles[cid]; removeTransferCard(cid); 
+                    updateCancelUI(cid);
+                    if(isHost) broadcast(data, conn); break;
+            }
+        }
+        function broadcast(pkg, exclude) { connections.forEach(c => { try { if(c !== exclude && c.open && (isHost ? c.authenticated : true)) c.send(pkg); } catch(e) {} }); }
+        
+        function sendMessage(e) {
+            if(e) e.preventDefault(); const text = els.txtInput.value.trim();
+            if(!text && !pendingFile) return; els.txtInput.value = ''; els.txtInput.style.height = 'auto';
+            if(text) { const msg = {sender: myName, text, time: Date.now()}; addMessageToUI(msg, true); const pkg = {type: 'CHAT', payload: msg}; if(isHost) broadcast(pkg); else if(myConn) myConn.send(pkg); soundManager.play('sent'); }
+            if(pendingFile) streamFile(pendingFile); pendingFile = null; clearFileSelection();
+        }
+
+        // --- FILE LOGIC ---
+        async function streamFile(file) {
+            const fileId = Math.random().toString(36).substr(2, 9);
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            const meta = { fileId, name: file.name, size: file.size, type: file.type, sender: myName, totalChunks };
+            activeTransfers[fileId] = { cancelled: false };
+            createTransferCard(fileId, file.name, file.size, 'upload');
+            addFileToChat(meta, true);
+
+            const pkg = { type: 'FILE_START', payload: meta };
+            if(isHost) broadcast(pkg); else if(myConn) myConn.send(pkg);
+
+            let offset = 0, chunkIndex = 0;
+            const wait = ms => new Promise(r => setTimeout(r, ms));
+            
+            while(offset < file.size) {
+                if(activeTransfers[fileId].cancelled) break;
+                const chunk = file.slice(offset, offset + CHUNK_SIZE);
+                const buffer = await chunk.arrayBuffer();
+                const dPkg = { type: 'FILE_CHUNK', payload: { fileId, index: chunkIndex, data: buffer } };
+                try {
+                    if(isHost) { for(let c of connections) { if(c.open && c.authenticated) { c.send(dPkg); if(c.dataChannel.bufferedAmount > 1024 * 1024) await wait(20); } } }
+                    else if(myConn) { myConn.send(dPkg); if(myConn.dataChannel.bufferedAmount > 1024 * 1024) await wait(20); }
+                } catch(e) { console.error("Upload interrupted", e); break; }
+                offset += chunk.size; chunkIndex++;
+                if(chunkIndex % 5 === 0) updateTransferProgress(fileId, Math.round((offset/file.size)*100));
+            }
+            if(!activeTransfers[fileId].cancelled) {
+                updateTransferProgress(fileId, 100);
+                completeTransferUI(fileId, true); 
+                setTimeout(() => removeTransferCard(fileId), 2000);
+            }
+            delete activeTransfers[fileId];
+        }
+
+        function initIncomingFile(meta) {
+            if(incomingFiles[meta.fileId]) return;
+            incomingFiles[meta.fileId] = { meta, chunks: [], received: 0 };
+            activeTransfers[meta.fileId] = { cancelled: false };
+            createTransferCard(meta.fileId, meta.name, meta.size, 'download');
+            addFileToChat(meta, false);
+            notify("Incoming File", `Receiving ${meta.name} from ${meta.sender}`);
+        }
+
+        function processFileChunk(p) {
+            if(activeTransfers[p.fileId] && activeTransfers[p.fileId].cancelled) return;
+            const f = incomingFiles[p.fileId]; if(!f) return;
+            f.chunks[p.index] = p.data; f.received++;
+            
+            if(f.received % 5 === 0) updateTransferProgress(p.fileId, Math.round((f.received/f.meta.totalChunks)*100));
+
+            if(f.received === f.meta.totalChunks) {
+                updateTransferProgress(p.fileId, 100);
+                const blob = new Blob(f.chunks, {type: f.meta.type});
+                const url = URL.createObjectURL(blob);
+                
+                const el = document.getElementById(`file-content-${p.fileId}`);
+                if(el) {
+                    el.innerHTML = `
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center"><i class="fas fa-check"></i></div>
+                            <div class="flex-1 min-w-0"><p class="text-xs font-bold text-white truncate">${safe(f.meta.name)}</p></div>
+                            <a href="${url}" download="${safe(f.meta.name)}" class="px-4 py-2 bg-emerald-600 rounded-lg text-xs text-white font-bold hover:bg-emerald-500 transition-colors shadow">SAVE</a>
+                        </div>`;
+                }
+                completeTransferUI(p.fileId, false);
+                delete incomingFiles[p.fileId]; delete activeTransfers[p.fileId];
+                soundManager.play('received'); setTimeout(() => removeTransferCard(p.fileId), 2000);
+            }
+        }
+
+        function addFileToChat(meta, isMe) {
+            const div = document.createElement('div');
+            div.className = `flex flex-col ${isMe?'items-end':'items-start'} mb-4 fade-in`;
+            const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            
+            const header = `
+                <div class="text-[10px] text-slate-400 mb-1 px-1 flex gap-2">
+                    <span class="font-bold text-slate-300">${isMe?'You':safe(meta.sender)}</span>
+                    <span class="opacity-50">${time}</span>
+                </div>`;
+            
+            const card = `
+                <div class="w-72 p-4 bg-slate-800 border border-slate-700 rounded-2xl shadow-lg" id="file-card-${meta.fileId}">
+                    <div id="file-content-${meta.fileId}">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div id="file-icon-${meta.fileId}" class="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center"><i class="fas fa-spinner fa-spin text-blue-400"></i></div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-bold text-white truncate">${safe(meta.name)}</p>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-wide">${(meta.size/1024/1024).toFixed(1)} MB</p>
+                            </div>
+                        </div>
+                        <div id="file-status-${meta.fileId}" class="text-[10px] text-slate-500 text-center">Transferring... check top right</div>
+                    </div>
+                </div>`;
+            
+            div.innerHTML = header + card;
+            els.msgs.appendChild(div); els.msgs.scrollTop = els.msgs.scrollHeight;
+        }
+
+        function addMessageToUI(msg, isMe) {
+            const div = document.createElement('div'); 
+            div.className = `flex flex-col ${isMe?'items-end':'items-start'} mb-4 group fade-in`;
+            const content = DOMPurify.sanitize(marked.parse(msg.text));
+            const time = new Date(msg.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            div.innerHTML = `
+                <div class="text-[10px] text-slate-400 mb-1 px-1 flex gap-2">
+                    <span class="font-bold text-slate-300">${isMe?'You':safe(msg.sender)}</span>
+                    <span class="opacity-50">${time}</span>
+                </div>
+                <div class="max-w-[85%] md:max-w-[75%] px-5 py-3 shadow-md ${isMe?'bg-blue-600 text-white rounded-3xl rounded-tr-sm':'bg-slate-700 text-gray-200 rounded-3xl rounded-tl-sm'} text-sm markdown-body leading-relaxed">
+                    ${content}
+                </div>`;
+            els.msgs.appendChild(div); els.msgs.scrollTop = els.msgs.scrollHeight;
+        }
+
+        // --- HELPERS ---
+        function addSystemMessage(txt) {
+            const div = document.createElement('div'); div.className = "flex justify-center my-4 fade-in";
+            div.innerHTML = `<span class="bg-slate-800/50 text-slate-500 text-[10px] px-3 py-1 rounded-full uppercase font-bold tracking-wider border border-slate-700/50 shadow-sm">${safe(txt)}</span>`;
+            els.msgs.appendChild(div);
+        }
+        function processFile(f) {
+            if(f.size > MAX_FILE_SIZE) return alert("File > 10GB"); pendingFile = f;
+            document.getElementById('preview-filename').innerText = f.name; document.getElementById('preview-filesize').innerText = (f.size/1024/1024).toFixed(1) + " MB";
+            const img = document.getElementById('preview-image'), icon = document.getElementById('preview-icon');
+            if(f.type.startsWith('image/')) { img.src = URL.createObjectURL(f); img.classList.remove('hidden'); icon.classList.add('hidden'); }
+            else { img.classList.add('hidden'); icon.classList.remove('hidden'); }
+            els.preview.classList.remove('hidden'); els.preview.classList.add('flex');
+        }
+        function clearFileSelection() { pendingFile = null; document.getElementById('file-input').value = ""; els.preview.classList.add('hidden'); els.preview.classList.remove('flex'); }
+        function handleChatKey(e) { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+        function setStatus(online) { const el = document.getElementById('status-indicator'); online ? (el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Online`, el.className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-900/20 px-2 py-0.5 rounded-sm border border-emerald-500/20 font-mono") : (el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> Offline`, el.className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-500 bg-slate-800/80 px-2 py-0.5 rounded-sm border border-slate-700/50 font-mono"); }
+        function disconnect() { if(peer) peer.destroy(); location.reload(); }
+        function updateUserListUI(list) { els.users.innerHTML = ''; list.forEach(u => { const li = document.createElement('li'); li.className = `p-2 rounded text-xs flex justify-between items-center ${u.isHost?'bg-blue-500/10 text-blue-300':'text-slate-300'}`; li.innerHTML = `<span>${safe(u.name)}</span> ${u.isHost?'<i class="fas fa-crown text-[10px] text-amber-400"></i>':''}`; els.users.appendChild(li); }); document.getElementById('user-count').innerHTML = `<i class="fas fa-users mr-1"></i> ${list.length}`; }
+        function syncUserList() { const list = [{name: myName, isHost: true, id: peer.id}, ...connections.map(c=>({name: c.user, isHost: false, id: c.peer}))]; updateUserListUI(list); broadcast({type: 'USER_LIST', payload: list}); }
+        
+        function copyRoomId() {
+            navigator.clipboard.writeText(roomId);
+            const el = document.getElementById('display-room-id');
+            // Visual feedback: Text turns green and pulses
+            el.classList.add('text-emerald-400', 'scale-105'); 
+            setTimeout(() => el.classList.remove('text-emerald-400', 'scale-105'), 600);
+        }
+
+        function copyInviteLink() { 
+            const url = window.location.origin + window.location.pathname + '#' + roomId; 
+            navigator.clipboard.writeText(url); 
+            const btn = document.querySelector('button[title="Copy Invite Link"]'); 
+            const originalHTML = btn.innerHTML; 
+            btn.innerHTML = '<i class="fas fa-check text-[10px]"></i>'; 
+            btn.classList.add('text-emerald-400'); 
+            setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('text-emerald-400'); }, 1000); 
+        }
+        
+        function startTimer() { els.timerContainer.classList.remove('hidden'); els.timerContainer.classList.add('flex'); roomTimer = setInterval(() => { const left = expireTimestamp - Date.now(); if(left <= 0) { clearInterval(roomTimer); disconnect(); } const m = Math.floor(left/60000); const s = Math.floor((left%60000)/1000); els.timeLeft.innerText = `${m}:${s.toString().padStart(2,'0')}`; }, 1000); }
+        function startHeartbeat() { if(heartbeatInterval) clearInterval(heartbeatInterval); heartbeatInterval = setInterval(() => { const ping = {type:'PING'}; if(isHost) connections.forEach(c => { if(c.open) c.send(ping); }); else if(myConn && myConn.open) myConn.send(ping); }, 5000); }
+        
+        (function() { const b = document.body, o = document.getElementById('drag-overlay'); b.addEventListener('dragover', e => { e.preventDefault(); if(!document.getElementById('view-chat').classList.contains('hidden')) o.style.opacity='1'; }); b.addEventListener('dragleave', e => { if(e.relatedTarget===null) o.style.opacity='0'; }); b.addEventListener('drop', e => { e.preventDefault(); o.style.opacity='0'; if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }); })();
+    </script>
+</body>
+</html>
