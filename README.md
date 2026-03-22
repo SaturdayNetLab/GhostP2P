@@ -1,4 +1,4 @@
-# 👻 GhostP2P v2 — Ephemeral Encrypted Chat
+# GhostP2P v2 — Ephemeral Encrypted Chat
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-stable-green.svg)]()
@@ -11,9 +11,9 @@ Built as a **single HTML file**. No build step, no dependencies to install, no b
 
 ---
 
-## ✨ Features
+## Features
 
-### 🔒 Security & Encryption
+### Security & Encryption
 
 - **ECDH P-256 Key Exchange** — Ephemeral keypairs generated per session. Every connection gets unique shared secrets with forward secrecy.
 - **AES-256-GCM Encryption** — Application-layer encryption on top of WebRTC DTLS. All messages, files, images, and voice messages are encrypted before transmission.
@@ -23,64 +23,64 @@ Built as a **single HTML file**. No build step, no dependencies to install, no b
 - **XSS Protection** — All user-generated content is sanitized through DOMPurify before rendering.
 - **Serverless P2P** — A public STUN server is used only for the initial WebRTC handshake. After that, all data flows directly between peers.
 
-### 💬 Chat
+### Chat
 
-- **Markdown Support** — Bold, italic, code blocks, links, lists.
-- **Typing Indicators** — See when your peer is typing.
-- **Message Grouping** — Consecutive messages from the same sender are visually grouped.
-- **Desktop Notifications** — Get notified of new messages when the tab is in the background.
-- **Sound Effects** — Distinct sounds for sent, received, join, and leave events.
+- Markdown support (bold, italic, code blocks, links, lists)
+- Typing indicators
+- Message grouping for consecutive messages
+- Desktop notifications for background messages
+- Distinct sound effects for sent, received, join, and leave events
 
-### 🎤 Voice Messages
+### Voice Messages
 
-- **Record & Send** — Click the microphone button to record encrypted voice messages.
-- **Live Waveform** — Real-time audio visualization during recording.
-- **In-Chat Player** — Play/pause voice messages directly in the chat with waveform display and duration.
-- **Echo Cancellation & Noise Suppression** — Clean audio capture via browser APIs.
+- Record and send encrypted voice messages
+- Live waveform visualization during recording
+- In-chat audio player with play/pause and duration display
+- Echo cancellation and noise suppression
 
-### 🖼️ Image Sharing
+### Image Sharing
 
-- **Inline Preview** — Images are displayed as thumbnails directly in the chat.
-- **Lightbox** — Click any image to view it fullscreen.
-- **Clipboard Paste** — Press `Ctrl+V` to paste and send screenshots instantly.
-- **Drag & Drop** — Drop image files anywhere on the window.
+- Inline image preview directly in the chat
+- Fullscreen lightbox on click
+- Clipboard paste with `Ctrl+V` for instant screenshot sharing
+- Drag & drop support
 
-### 📁 File Transfer
+### File Transfer
 
-- **Up to 10 GB** — Smart 64KB chunking algorithm for large file transfers.
-- **Progress Tracking** — Floating transfer cards with real-time progress bars.
-- **Cancellation** — Cancel active transfers at any time.
-- **File Type Icons** — Visual icons for PDF, Word, Excel, video, audio, and more.
+- Transfers up to 10 GB with 64KB chunking
+- Floating progress cards with real-time percentage
+- Cancel active transfers at any time
+- File type icons for PDF, Word, Excel, video, audio, and more
 
-### 🛠️ Room Management
+### Room Management
 
-- **Password-Protected Rooms** — Optional room passwords with PBKDF2-derived authentication.
-- **Self-Destruct Timer** — Set rooms to auto-close after 10 min, 30 min, or 1 hour.
-- **QR Code Invites** — Share rooms via a visual QR code.
-- **Invite Links** — One-click copy of the full invite URL.
-- **Member Sidebar** — See all connected peers with color-coded avatars.
-- **Disconnect Detection** — System messages when peers join or leave.
+- Optional password-protected rooms (PBKDF2-derived authentication)
+- Self-destruct timer (10 min, 30 min, 1 hour)
+- QR code room invites
+- One-click invite link copy
+- Member sidebar with color-coded avatars
+- System messages when peers join or leave
 
-### 🎨 UI/UX
+### UI/UX
 
-- **Glassmorphism Design** — Modern dark UI with ambient light orbs and noise texture.
-- **Fully Responsive** — Optimized for desktop and mobile (`100dvh`).
-- **Animated Transitions** — Smooth fade-in, slide, and scale animations.
-- **Toast Notifications** — Non-intrusive status messages.
+- Modern dark glassmorphism design with ambient light effects
+- Fully responsive — desktop and mobile (`100dvh`)
+- Smooth animations and transitions
+- Toast notifications
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Open Directly
 
 1. Download `index.html`
 2. Open it in any modern browser (Chrome, Firefox, Edge, Brave, Safari)
-3. Done — no server needed for local testing
+3. Done
 
 > **Note:** For two devices to connect, the file must be served over HTTPS (required by WebRTC). Opening locally works for testing on the same machine.
 
-### Option 2: Deploy to Any Web Server
+### Option 2: Deploy
 
 Host the single HTML file on any static hosting:
 
@@ -89,7 +89,7 @@ Host the single HTML file on any static hosting:
 - Any web server (Nginx, Apache, Caddy)
 
 ```bash
-# Example: GitHub Pages
+# GitHub Pages example
 git add index.html
 git commit -m "Deploy GhostP2P v2"
 git push origin main
@@ -98,41 +98,41 @@ git push origin main
 
 ---
 
-## 📖 Usage
+## Usage
 
 ### Host a Room
 
-1. Enter your **display name**
-2. (Optional) Set a **password** and/or **self-destruct timer**
+1. Enter your display name
+2. Optionally set a password and/or self-destruct timer
 3. Click **Create Room**
-4. Share the **Room ID** — click it to copy, or use the 🔗 (link) or 📱 (QR) buttons
+4. Share the Room ID — click it to copy, or use the link/QR buttons in the topbar
 
 ### Join a Room
 
-1. Enter your **display name**
-2. Paste the **Room ID** (or use an invite link — it auto-fills)
-3. Enter the **password** if one was set
+1. Enter your display name
+2. Paste the Room ID (or use an invite link — it auto-fills)
+3. Enter the password if required
 4. Click **Connect**
 
 ### Verify Encryption
 
-After connecting, a **Safety Number** appears in the chat. Both you and your peer will see the same number. Compare it via phone call, SMS, or in person. If the numbers match, your connection is verified — no one is intercepting it.
+After connecting, a **Safety Number** appears in the chat. Both peers see the same number. Compare it via a separate channel (phone call, in person). If the numbers match, your connection is verified and no one is intercepting it.
 
 ### Send Files & Images
 
 - **Drag & Drop** — Drop files anywhere on the chat window
 - **Clipboard** — Copy an image and press `Ctrl+V`
-- **Attach** — Click the 📎 button to select a file
+- **Attach** — Click the paperclip button to select a file
 
 ### Send Voice Messages
 
-1. Click the 🎤 (microphone) button
-2. Record your message — a live waveform and timer are shown
-3. Click the ✅ (send) button to send, or 🗑️ (trash) to cancel
+1. Click the microphone button
+2. Record your message (live waveform + timer shown)
+3. Click send to deliver, or trash to cancel
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Action | Shortcut |
 |---|---|
@@ -142,11 +142,11 @@ After connecting, a **Safety Number** appears in the chat. Both you and your pee
 
 ---
 
-## 🔧 Technical Stack
+## Technical Stack
 
 | Component | Technology |
 |---|---|
-| Networking | [PeerJS](https://peerjs.com/) (WebRTC wrapper) |
+| Networking | [PeerJS](https://peerjs.com/) 1.5.2 (WebRTC wrapper) |
 | Key Exchange | ECDH P-256 (Web Crypto API) |
 | Encryption | AES-256-GCM (Web Crypto API) |
 | Password Hashing | PBKDF2 SHA-256, 100k iterations |
@@ -154,7 +154,6 @@ After connecting, a **Safety Number** appears in the chat. Both you and your pee
 | Markdown | [Marked.js](https://github.com/markedjs/marked) 15.0.7 |
 | Icons | [Font Awesome](https://fontawesome.com/) 6.5.1 |
 | Fonts | Outfit + JetBrains Mono (Google Fonts) |
-| UI | Vanilla CSS with CSS Variables, Glassmorphism |
 
 ### How It Works
 
@@ -174,35 +173,35 @@ The STUN server only sees that two peers want to connect (IP metadata). It never
 
 ### What GhostP2P Protects Against
 
-✅ Message interception (encrypted in transit)
-✅ Server-side data storage (no server stores anything)
-✅ XSS attacks (DOMPurify sanitization)
-✅ Weak room passwords (PBKDF2 100k iterations)
-✅ Man-in-the-middle attacks (Safety Number verification)
-✅ Session persistence (RAM-only, ephemeral keys)
+- Message interception — encrypted in transit with AES-256-GCM
+- Server-side data storage — no server stores anything
+- XSS attacks — DOMPurify sanitization on all rendered content
+- Weak room passwords — PBKDF2 with 100k iterations
+- Man-in-the-middle attacks — Safety Number verification
+- Session persistence — RAM-only, ephemeral keys per session
 
 ### Known Limitations
 
-⚠️ **Metadata** — The PeerJS signaling server sees that Peer A connects to Peer B (IP addresses), but not what they communicate.
-⚠️ **STUN Servers** — Google's STUN servers see both peers' IP addresses during the initial handshake.
-⚠️ **CDN Trust** — External libraries (PeerJS, DOMPurify, Marked, Font Awesome) are loaded from CDNs. If a CDN is compromised, malicious code could be injected. Pin versions are used to minimize this risk.
-⚠️ **Browser Trust** — Security relies on the browser's Web Crypto API implementation being correct.
+- **Metadata** — The PeerJS signaling server sees that Peer A connects to Peer B (IP addresses), but not what they communicate.
+- **STUN Servers** — Google's STUN servers see both peers' IP addresses during the initial handshake.
+- **CDN Trust** — External libraries are loaded from CDNs. All are pinned to exact versions to minimize supply-chain risk.
+- **Browser Trust** — Security relies on the browser's Web Crypto API implementation being correct.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! Since this is a single-file project:
+Contributions are welcome. Since this is a single-file project:
 
 1. Keep everything in one HTML file
 2. Don't add heavy external dependencies
 3. Test with at least 2 peers before submitting a PR
-4. Test file transfers (small + large files)
+4. Test file transfers (small + large)
 5. Test on mobile
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
