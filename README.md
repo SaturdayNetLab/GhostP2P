@@ -9,6 +9,14 @@
 
 Built as a **single HTML file**. No build step, no dependencies to install, no backend.
 
+<p align="center">
+  <img src="Screenshots/Screenshot 2026-03-22 160959.png" width="100%" alt="Lobby View">
+</p>
+<p align="center">
+  <img src="Screenshots/Screenshot 2026-03-22 161044.png" width="49%" alt="Chat View">
+  <img src="Screenshots/Screenshot 2026-03-22 161057.png" width="49%" alt="Security Info">
+</p>
+
 ---
 
 ## Features
