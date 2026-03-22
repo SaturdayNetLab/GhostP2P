@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>GhostP2P v2 — Ephemeral Encrypted Chat</title>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -193,6 +193,13 @@ select.input{cursor:pointer;appearance:none;background-image:url("data:image/svg
 .help-keys{display:flex;flex-direction:column;gap:6px}
 .help-keys div{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:var(--radius-sm);border-bottom:1px solid var(--border-subtle);font-size:12px;color:var(--text-secondary)}
 .help-keys kbd{font-family:var(--font-mono);font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.06);border:1px solid var(--border-default);color:var(--text-muted)}
+
+/* FINGERPRINT / SAFETY NUMBER */
+.fp-card{cursor:pointer;display:inline-block;padding:14px 20px;border-radius:var(--radius-md);background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.15);transition:border-color .2s;text-align:center;max-width:400px}
+.fp-card:hover{border-color:rgba(16,185,129,.35)}
+.fp-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent-emerald);margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:6px}
+.fp-nums{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text-primary);letter-spacing:2px;line-height:1.8;word-spacing:6px}
+.fp-hint{font-size:10px;color:var(--text-muted);margin-top:8px}
 </style>
 </head>
 <body>
@@ -203,6 +210,16 @@ select.input{cursor:pointer;appearance:none;background-image:url("data:image/svg
 <div class="transfer-panel" id="TP"></div>
 <div class="lightbox" id="LB" onclick="this.classList.remove('active')"><img id="LBI" src=""></div>
 <div class="modal-overlay" id="QM" onclick="if(event.target===this)this.classList.remove('active')"><div class="modal-box glass-strong"><h3><i class="fas fa-qrcode" style="color:var(--accent-violet);margin-right:8px"></i>Room QR</h3><p>Scan to join</p><canvas id="QC" width="200" height="200"></canvas><button class="modal-close" onclick="$('QM').classList.remove('active')">Close</button></div></div>
+
+<!-- FINGERPRINT VERIFY MODAL -->
+<div class="modal-overlay" id="FM" onclick="if(event.target===this)this.classList.remove('active')">
+  <div class="modal-box glass-strong" style="max-width:440px;text-align:left">
+    <h3 style="text-align:center"><i class="fas fa-fingerprint" style="color:var(--accent-emerald);margin-right:8px"></i>Verify Safety Numbers</h3>
+    <p style="text-align:center;font-size:12px;color:var(--text-secondary);margin-bottom:16px">Compare these numbers with your peer via a separate channel (phone, in person). If they match, no one is intercepting your connection.</p>
+    <div id="FPB"></div>
+    <button class="modal-close" onclick="$('FM').classList.remove('active')">Close</button>
+  </div>
+</div>
 
 <!-- HELP / ABOUT OVERLAY -->
 <div class="modal-overlay" id="HO" onclick="if(event.target===this)this.classList.remove('active')">
@@ -239,6 +256,10 @@ select.input{cursor:pointer;appearance:none;background-image:url("data:image/svg
           <div class="help-card">
             <div class="help-card-icon" style="color:var(--accent-rose);background:rgba(244,63,94,.1)"><i class="fas fa-satellite-dish"></i></div>
             <div><strong>Serverless P2P</strong><p>A public STUN server is used only for the initial handshake. After that, all data flows directly between peers. No middleman.</p></div>
+          </div>
+          <div class="help-card">
+            <div class="help-card-icon" style="color:var(--accent-blue);background:rgba(59,130,246,.1)"><i class="fas fa-fingerprint"></i></div>
+            <div><strong>Safety Number Verification</strong><p>After connecting, both peers see a shared Safety Number. Compare it via a separate channel to confirm no man-in-the-middle attack.</p></div>
           </div>
         </div>
       </div>
@@ -321,7 +342,7 @@ select.input{cursor:pointer;appearance:none;background-image:url("data:image/svg
       <div class="chat-topbar">
         <div class="room-info">
           <button class="btn btn-icon btn-ghost hide-d" onclick="$('SB').classList.add('open')" style="width:32px;height:32px;font-size:14px"><i class="fas fa-bars"></i></button>
-          <div><div style="display:flex;align-items:center;gap:8px"><button class="room-id-btn" id="RI" onclick="A.copyId()">---</button><button class="invite-btn" onclick="A.copyLink()" title="Invite link"><i class="fas fa-link"></i></button><button class="qr-btn" onclick="A.showQR()" title="QR"><i class="fas fa-qrcode"></i></button></div><div style="font-size:10px;color:var(--text-muted);margin-top:2px"><i class="fas fa-users" style="margin-right:4px"></i><span id="UC">1</span></div></div>
+          <div><div style="display:flex;align-items:center;gap:8px"><button class="room-id-btn" id="RI" onclick="A.copyId()">---</button><button class="invite-btn" onclick="A.copyLink()" title="Invite link"><i class="fas fa-link"></i></button><button class="qr-btn" onclick="A.showQR()" title="QR"><i class="fas fa-qrcode"></i></button><button class="qr-btn" onclick="A.showFPModal()" title="Verify encryption" style="background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.2);color:var(--accent-emerald)"><i class="fas fa-fingerprint"></i></button></div><div style="font-size:10px;color:var(--text-muted);margin-top:2px"><i class="fas fa-users" style="margin-right:4px"></i><span id="UC">1</span></div></div>
         </div>
         <div class="timer-badge" id="TB"><i class="fas fa-clock"></i><span id="TD">--:--</span></div>
       </div>
@@ -362,7 +383,20 @@ const C={
   gs(){return crypto.getRandomValues(new Uint8Array(16))},
   s2b(s){return btoa(String.fromCharCode(...s))},b2s(b){return Uint8Array.from(atob(b),c=>c.charCodeAt(0))},
   toB(a){const ch=[];for(let i=0;i<a.length;i+=8192)ch.push(String.fromCharCode(...a.slice(i,i+8192)));return btoa(ch.join(''))},
-  frB(b){return Uint8Array.from(atob(b),c=>c.charCodeAt(0))}
+  frB(b){return Uint8Array.from(atob(b),c=>c.charCodeAt(0))},
+  // Safety Number: SHA-256 hash of sorted(pubKeyA + pubKeyB), displayed as groups of digits
+  async fingerprint(pubB64A, pubB64B) {
+    const sorted = [pubB64A, pubB64B].sort();
+    const combined = new TextEncoder().encode(sorted[0] + sorted[1]);
+    const hash = await crypto.subtle.digest('SHA-256', combined);
+    const arr = new Uint8Array(hash);
+    // Convert to 12 groups of 5 digits (60 digits total from 32 bytes)
+    let num = '';
+    for (let i = 0; i < arr.length; i++) num += arr[i].toString().padStart(3, '0');
+    const groups = [];
+    for (let i = 0; i < 60; i += 5) groups.push(num.substring(i, i + 5));
+    return groups.join(' ');
+  }
 };
 
 const Sound={ctx:null,muted:false,init(){if(!this.ctx){const X=window.AudioContext||window.webkitAudioContext;if(X)this.ctx=new X()}if(this.ctx?.state==='suspended')this.ctx.resume()},toggle(){this.muted=!this.muted;$('BS').innerHTML=this.muted?'<i class="fas fa-volume-mute"></i>':'<i class="fas fa-volume-up"></i>'},play(t){if(!this.ctx||this.muted)return;if(this.ctx.state==='suspended')this.ctx.resume();const o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type='sine';o.connect(g);g.connect(this.ctx.destination);const n=this.ctx.currentTime;if(t==='sent'){o.frequency.setValueAtTime(520,n);o.frequency.exponentialRampToValueAtTime(320,n+.12);g.gain.setValueAtTime(.04,n);g.gain.exponentialRampToValueAtTime(.0001,n+.15);o.start(n);o.stop(n+.2)}else if(t==='received'){o.frequency.setValueAtTime(320,n);o.frequency.linearRampToValueAtTime(440,n+.08);g.gain.setValueAtTime(0,n);g.gain.linearRampToValueAtTime(.06,n+.04);g.gain.exponentialRampToValueAtTime(.0001,n+.25);o.start(n);o.stop(n+.3)}else if(t==='join'){o.frequency.setValueAtTime(440,n);o.frequency.exponentialRampToValueAtTime(660,n+.15);g.gain.setValueAtTime(.04,n);g.gain.exponentialRampToValueAtTime(.0001,n+.2);o.start(n);o.stop(n+.25)}else if(t==='leave'){o.frequency.setValueAtTime(440,n);o.frequency.exponentialRampToValueAtTime(220,n+.2);g.gain.setValueAtTime(.04,n);g.gain.exponentialRampToValueAtTime(.0001,n+.25);o.start(n);o.stop(n+.3)}}};
@@ -403,7 +437,7 @@ const V={
       if(blob.size<500){toast('Too short','e');r();return}
       const ab=await blob.arrayBuffer();const arr=new Uint8Array(ab);
       const wf=[];for(let i=0;i<32;i++)wf.push(Math.random()*.7+.15);
-      await A.sendVoice(arr,dur,wf,blob.type);r()};this.mr.stop()})
+      await A.sendVoice(arr,dur,wf,mimeType);r()};this.mr.stop()})
   },
   cleanup(){clearInterval(this.ti);cancelAnimationFrame(this.af);if(this.stream)this.stream.getTracks().forEach(t=>t.stop());$('RO').classList.remove('active');$('IR').style.display='flex';$('MB').classList.remove('recording');this.stream=null;this.mr=null;this.an=null}
 };
@@ -411,12 +445,12 @@ const V={
 // ═══ APP ═══
 const A={
   peer:null,conns:[],isH:false,name:'',rid:'',rpw:'',pSalt:null,pHash:'',
-  exp:0,tInt:null,kp:null,pf:null,inc:{},at:{},
+  exp:0,tInt:null,kp:null,myPub:'',pf:null,inc:{},at:{},
   tSend:null,tHide:null,isSent:false,lastS:null,lastT:0,
   store:{},_audio:null,
 
-  async host(e){e.preventDefault();this.name=$('HN').value.trim()||'Anon';this.rpw=$('HP').value;const d=parseInt($('HD').value);if(d>0)this.exp=Date.now()+d*60000;this.isH=true;this.rid='ghost-'+gid();this.kp=await C.gkp();if(this.rpw){this.pSalt=C.gs();this.pHash=await C.dpw(this.rpw,this.pSalt)}this.initPeer(this.rid)},
-  async join(e){e.preventDefault();this.name=$('JN').value.trim()||'Anon';let id=$('JI').value.trim();if(id.includes('#ghost-'))id=id.split('#')[1];if(!id.startsWith('ghost-'))id='ghost-'+id;this.rid=id;this.rpw=$('JP').value;this.isH=false;this.kp=await C.gkp();this.initPeer('ghost-j-'+gid())},
+  async host(e){e.preventDefault();this.name=$('HN').value.trim()||'Anon';this.rpw=$('HP').value;const d=parseInt($('HD').value);if(d>0)this.exp=Date.now()+d*60000;this.isH=true;this.rid='ghost-'+gid();this.kp=await C.gkp();this.myPub=await C.ep(this.kp);if(this.rpw){this.pSalt=C.gs();this.pHash=await C.dpw(this.rpw,this.pSalt)}this.initPeer(this.rid)},
+  async join(e){e.preventDefault();this.name=$('JN').value.trim()||'Anon';let id=$('JI').value.trim();if(id.includes('#ghost-'))id=id.split('#')[1];if(!id.startsWith('ghost-'))id='ghost-'+id;this.rid=id;this.rpw=$('JP').value;this.isH=false;this.kp=await C.gkp();this.myPub=await C.ep(this.kp);this.initPeer('ghost-j-'+gid())},
   initPeer(id){this.setSt('connecting');this.peer=new Peer(id,{config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]}});
     this.peer.on('open',()=>{if(this.isH){this.setSt('online');this.showChat();this.sysMsg('Room created. Share Room ID.');this.startTimer()}else{const c=this.peer.connect(this.rid,{reliable:true});c.on('open',()=>this.jConn(c));c.on('error',()=>{toast('Failed','e');this.setSt('offline')})}});
     this.peer.on('connection',c=>c.on('open',()=>this.hConn(c)));
@@ -424,13 +458,19 @@ const A={
   async hConn(cn){const pk=await C.ep(this.kp);cn.send({type:'HS',p:{pk,np:!!this.rpw,ps:this.pSalt?C.s2b(this.pSalt):null,hn:this.name}});cn._s='wait';
     cn.on('data',async d=>{
       if(cn._s==='wait'&&d.type==='AU'){if(this.rpw&&d.p.ph!==this.pHash){cn.send({type:'AF',p:{r:'Wrong password'}});setTimeout(()=>cn.close(),500);return}
-        try{const jp=await C.ip(d.p.pk);const sk=await C.dk(this.kp.privateKey,jp);cn._s='ok';const en={conn:cn,name:d.p.name,sk};this.conns.push(en);cn.send({type:'AO',p:{name:this.name}});this.sysMsg(`${safe(d.p.name)} joined`);Sound.play('join');if(this.conns.length>0)this.setSt('encrypted');this.bcast();this.uList();cn.on('close',()=>this.left(en))}catch(er){cn.send({type:'AF',p:{r:'Key exchange failed'}});cn.close()}}
+        try{const jp=await C.ip(d.p.pk);const sk=await C.dk(this.kp.privateKey,jp);cn._s='ok';const en={conn:cn,name:d.p.name,sk,pub:d.p.pk};this.conns.push(en);cn.send({type:'AO',p:{name:this.name}});this.sysMsg(`${safe(d.p.name)} joined`);Sound.play('join');if(this.conns.length>0)this.setSt('encrypted');this.bcast();this.uList();
+          // Compute safety number
+          C.fingerprint(this.myPub,d.p.pk).then(fp=>{en.fp=fp;this.showFingerprint(d.p.name,fp)});
+          cn.on('close',()=>this.left(en))}catch(er){cn.send({type:'AF',p:{r:'Key exchange failed'}});cn.close()}}
       else if(cn._s==='ok'){const en=this.conns.find(e=>e.conn===cn);if(en)this.hData(d,en)}
     })},
   async jConn(cn){cn.on('data',async d=>{
     if(d.type==='HS'){cn._hpk=d.p.pk;let ph=null;if(d.p.np){if(!this.rpw){toast('Password required','e');cn.close();return}ph=await C.dpw(this.rpw,C.b2s(d.p.ps))}cn.send({type:'AU',p:{pk:await C.ep(this.kp),name:this.name,ph}})}
     else if(d.type==='AF'){toast(d.p.r||'Auth failed','e');cn.close();this.setSt('offline')}
-    else if(d.type==='AO'){try{const hp=await C.ip(cn._hpk);const sk=await C.dk(this.kp.privateKey,hp);this.conns.push({conn:cn,name:d.p.name,sk});this.setSt('encrypted');this.showChat();this.sysMsg('Connected. E2E active.');Sound.play('join');cn.on('close',()=>{this.sysMsg(`${safe(d.p.name)} disconnected`);Sound.play('leave');this.conns=this.conns.filter(e=>e.conn!==cn);this.setSt('offline');toast('Host disconnected','e')})}catch(er){toast('Crypto failed','e');cn.close()}}
+    else if(d.type==='AO'){try{const hp=await C.ip(cn._hpk);const sk=await C.dk(this.kp.privateKey,hp);const en={conn:cn,name:d.p.name,sk,pub:cn._hpk};this.conns.push(en);this.setSt('encrypted');this.showChat();this.sysMsg('Connected. E2E active.');Sound.play('join');
+      // Compute safety number
+      C.fingerprint(this.myPub,cn._hpk).then(fp=>{en.fp=fp;this.showFingerprint(d.p.name,fp)});
+      cn.on('close',()=>{this.sysMsg(`${safe(d.p.name)} disconnected`);Sound.play('leave');this.conns=this.conns.filter(e=>e.conn!==cn);this.setSt('offline');toast('Host disconnected','e')})}catch(er){toast('Crypto failed','e');cn.close()}}
     else if(d.type==='ENC'){try{const e=this.conns[0];if(!e)return;const p=await C.dect(e.sk,C.frB(d.p.data));this.hDec(JSON.parse(p))}catch(er){}}
     else if(d.type==='ECK'){try{const e=this.conns[0];if(!e)return;const p=await C.dec(e.sk,C.frB(d.p.data));this.hChunk(d.p.fid,d.p.ci,new Uint8Array(p),d.p.tc,d.p.fn,d.p.fs,d.p.sn,d.p.ft)}catch(er){}}
     else this.hPlain(d)})},
@@ -549,10 +589,34 @@ const A={
   copyLink(){navigator.clipboard.writeText(`${location.origin}${location.pathname}#${this.rid}`).then(()=>toast('Link copied','s'))},
   showQR(){QR.draw($('QC'),`${location.origin}${location.pathname}#${this.rid}`);$('QM').classList.add('active')},
 
+  // Safety Number display
+  showFingerprint(peerName, fp) {
+    this.sysMsg(`🔐 Safety number with ${safe(peerName)}: verify this matches on both devices`);
+    const el = document.createElement('div');
+    el.className = 'msg-system';
+    el.innerHTML = `<div class="fp-card" onclick="A.showFPModal()">
+      <div class="fp-label"><i class="fas fa-fingerprint" style="color:var(--accent-emerald)"></i> Safety Number</div>
+      <div class="fp-nums">${safe(fp)}</div>
+      <div class="fp-hint">Tap to verify — both sides must show the same number</div>
+    </div>`;
+    $('MS').appendChild(el);
+    this.dn();
+  },
+  showFPModal() {
+    const peers = this.conns.filter(c => c.fp);
+    if (!peers.length) { toast('No verified connections', 'e'); return; }
+    let html = '';
+    for (const p of peers) {
+      html += `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text-primary)"><i class="fas fa-user" style="color:${gc(p.name)};margin-right:6px"></i>${safe(p.name)}</div><div class="fp-nums" style="font-size:14px">${safe(p.fp)}</div></div>`;
+    }
+    $('FPB').innerHTML = html;
+    $('FM').classList.add('active');
+  },
+
   setSt(s){const c=$('SC'),t=$('ST');c.className='status-chip';if(s==='online'){c.classList.add('status-online');t.textContent='ONLINE'}else if(s==='encrypted'){c.classList.add('status-encrypted');t.textContent='ENCRYPTED'}else if(s==='connecting'){c.classList.add('status-offline');t.textContent='CONNECTING…'}else{c.classList.add('status-offline');t.textContent='OFFLINE'}},
   showChat(){$('VL').classList.add('view-hidden');$('VC').classList.remove('view-hidden');$('RI').textContent=this.rid;this.rList([this.name]);setTimeout(()=>$('MI').focus(),100);if(Notification.permission==='default')Notification.requestPermission()},
   key(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();this.send()}},
-  disconnect(){for(const e of this.conns)try{e.conn.close()}catch(er){}this.conns=[];if(this.peer){this.peer.destroy();this.peer=null}if(this.tInt)clearInterval(this.tInt);this.setSt('offline');this.isH=false;this.exp=0;this.pf=null;this.inc={};this.at={};this.kp=null;this.rpw='';this.pSalt=null;this.pHash='';$('FP').classList.remove('active');$('TP').innerHTML='';$('TB').classList.remove('active');$('VC').classList.add('view-hidden');$('VL').classList.remove('view-hidden');$('MS').innerHTML='<div class="msg-system"><span class="sys-badge"><i class="fas fa-shield-alt" style="color:var(--accent-emerald)"></i> E2E · AES-256-GCM · ECDH P-256</span></div>';this.lastS=null;this.store={}},
+  disconnect(){for(const e of this.conns)try{e.conn.close()}catch(er){}this.conns=[];if(this.peer){this.peer.destroy();this.peer=null}if(this.tInt)clearInterval(this.tInt);this.setSt('offline');this.isH=false;this.exp=0;this.pf=null;this.inc={};this.at={};this.kp=null;this.myPub='';this.rpw='';this.pSalt=null;this.pHash='';$('FP').classList.remove('active');$('TP').innerHTML='';$('TB').classList.remove('active');$('VC').classList.add('view-hidden');$('VL').classList.remove('view-hidden');$('MS').innerHTML='<div class="msg-system"><span class="sys-badge"><i class="fas fa-shield-alt" style="color:var(--accent-emerald)"></i> E2E · AES-256-GCM · ECDH P-256</span></div>';this.lastS=null;this.store={}},
   dn(){const e=$('MS');e.scrollTop=e.scrollHeight}
 };
 
